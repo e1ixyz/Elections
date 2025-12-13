@@ -1,0 +1,9 @@
+me/codex/elections/ElectionsPlugin.class
+me/codex/elections/model/Election$Status.class
+me/codex/elections/util/DurationUtil.class
+me/codex/elections/commands/VoteCommand.class
+me/codex/elections/model/Election.class
+me/codex/elections/service/ElectionManager.class
+me/codex/elections/commands/ElectionsCommand.class
+me/codex/elections/service/ElectionManager$ActionResult.class
+me/codex/elections/service/ScoreboardService.class

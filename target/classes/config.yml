@@ -1,0 +1,22 @@
+scoreboard:
+  title: "&a&lElections"
+  max-candidates: 10
+  show-vote-tip: true
+  show-vote-counts: true
+
+commands-on-win:
+  - 'lp user %winner% meta addprefix 2 "JUDGE"'
+  - 'tellraw %winner% {"text":"You have been elected as Judge","color":"red"}'
+
+messages:
+  no-election: "&cThere is no active election right now."
+  not-nominated: "&cThat player is not a nominee."
+  already-nominated: "&eThat player is already nominated."
+  created: "&aElection for &f%role% &ahas started and ends in &f%duration%&a."
+  ended: "&eElection has ended."
+  vote-accepted: "&aYou voted for &f%candidate%&a."
+  vote-updated: "&eYou changed your vote to &f%candidate%&e."
+  cannot-self-nominate: "&cYou cannot nominate yourself."
+  nomination-success: "&a%target% has been nominated for %role%!"
+  rigged: "&cVotes have been rigged for %winner%."
+  tie-extended: "&eElection was tied. Extending by 24h for top two candidates."
