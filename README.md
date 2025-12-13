@@ -1,0 +1,47 @@
+# Elections Plugin (Paper 1.21)
+
+Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie handling, and console hooks.
+
+## Features
+- Single active election at a time with role + countdown.
+- Nominate others (no self-nominations), player voting via `/vote`.
+- Live sidebar showing role, timer, nominees, vote counts (configurable), vote hint, and results after close.
+- Admin rig command, manual end, and automatic 24h tie extensions between top two until a winner.
+- Console commands on win with `%winner%` and `%role%` placeholders.
+
+## Commands
+- `/elections` or `/elections help` — show help.
+- `/elections status` — show current election info.
+- `/elections nominate <player>` — nominate someone.
+- `/vote <player>` — vote for a nominee.
+- `/elections create <role> <duration>` — start an election (admin).
+  - Duration formats: `1d2h`, `6h30m`, `45m`, `90s` etc.
+- `/elections rig <player>` — change all votes to a player (admin).
+- `/elections end` — end/clear the election and scoreboard (admin).
+
+## Permissions
+- `elections.admin` — required for `create`, `rig`, `end` (default: op).
+All other commands are available to everyone.
+
+## Config (`config.yml`)
+- `scoreboard.title` — sidebar title.
+- `scoreboard.max-candidates` — cap visible nominees (ellipsis if more).
+- `scoreboard.show-vote-tip` — show `/vote` hint.
+- `scoreboard.show-vote-counts` — show numbers next to nominees.
+- `commands-on-win` — console commands run when a winner exists. Placeholders: `%winner%`, `%role%`.
+- `messages.*` — tweak player-facing messages.
+
+## Build
+Requirements: Java 21+, Maven.
+
+```sh
+mvn -q package
+```
+
+Output: `target/elections-1.0.0-SNAPSHOT.jar` (shade-ready, dependencies provided by Paper).
+
+## Usage Notes
+- Only one election at a time; use `/elections end` to clear it.
+- Players cannot nominate themselves.
+- Scoreboard reattaches on join and remains after close until cleared.
+# Elections
