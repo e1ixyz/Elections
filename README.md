@@ -6,6 +6,7 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - Single active election at a time with role + countdown.
 - Nominate others (no self-nominations), player voting via `/vote`.
 - Live sidebar showing role, timer, nominees, vote counts (configurable), vote hint, and results after close.
+- Nominee platforms (plans/manifestos): nominees set their plan; everyone can view via command (hint on scoreboard).
 - Admin rig command, manual end, and automatic 24h tie extensions between top two until a winner.
 - Console commands on win with `%winner%` and `%role%` placeholders.
 
@@ -14,6 +15,8 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - `/elections status` — show current election info.
 - `/elections nominate <player>` — nominate someone.
 - `/vote <player>` — vote for a nominee.
+- `/elections platform <player>` — view a nominee's platform.
+- `/elections platform set <text>` — (nominees) set your platform/plan.
 - `/elections create <role> <duration>` — start an election (admin).
   - Duration formats: `1d2h`, `6h30m`, `45m`, `90s` etc.
 - `/elections rig <player>` — change all votes to a player (admin).
@@ -27,6 +30,7 @@ All other commands are available to everyone.
 - `scoreboard.title` — sidebar title.
 - `scoreboard.max-candidates` — cap visible nominees (ellipsis if more).
 - `scoreboard.show-vote-tip` — show `/vote` hint.
+- `scoreboard.show-platform-tip` — show `/elections platform <name>` hint.
 - `scoreboard.show-vote-counts` — show numbers next to nominees.
 - `commands-on-win` — console commands run when a winner exists. Placeholders: `%winner%`, `%role%`.
 - `messages.*` — tweak player-facing messages.

@@ -3,6 +3,7 @@ scoreboard:
   max-candidates: 10
   show-vote-tip: true
   show-vote-counts: true
+  show-platform-tip: true
 
 commands-on-win:
   - 'lp user %winner% meta addprefix 2 "JUDGE"'
@@ -20,3 +21,7 @@ messages:
   nomination-success: "&a%target% has been nominated for %role%!"
   rigged: "&cVotes have been rigged for %winner%."
   tie-extended: "&eElection was tied. Extending by 24h for top two candidates."
+  not-nominee: "&cYou must be a nominee to do that."
+  platform-set: "&aUpdated your platform: &f%platform%"
+  platform-view: "&bPlatform for &f%target%&b: &f%platform%"
+  platform-missing: "&eThat nominee has not set a platform yet."

@@ -94,6 +94,31 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(status.message());
                 return true;
             }
+            case "platform" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " platform set <your plan> OR /" + label + " platform <nominee>");
+                    return true;
+                }
+                if (args[1].equalsIgnoreCase("set")) {
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage(ChatColor.RED + "Only players can set their platform.");
+                        return true;
+                    }
+                    if (args.length < 3) {
+                        sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " platform set <your plan>");
+                        return true;
+                    }
+                    String platform = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                    ElectionManager.ActionResult result = manager.setPlatform(player, player, platform);
+                    sender.sendMessage(result.message());
+                    return true;
+                }
+
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                ElectionManager.ActionResult result = manager.viewPlatform(target);
+                sender.sendMessage(result.message());
+                return true;
+            }
             default -> {
                 sendHelp(sender);
                 return true;
@@ -107,6 +132,8 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         lines.add(color("&7/elections help &f- Show this help"));
         lines.add(color("&7/elections status &f- View current election info"));
         lines.add(color("&7/elections nominate <player> &f- Nominate someone (not yourself)"));
+        lines.add(color("&7/elections platform <player> &f- View a nominee's platform"));
+        lines.add(color("&7/elections platform set <text> &f- (Nominees) Set your platform"));
         lines.add(color("&7/vote <player> &f- Vote for a nominee"));
         if (sender.hasPermission("elections.admin")) {
             lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
@@ -123,7 +150,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate"));
+            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform"));
             if (sender.hasPermission("elections.admin")) {
                 base.addAll(Arrays.asList("create", "rig", "end"));
             }
@@ -136,6 +163,17 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
             if (sub.equals("nominate") || sub.equals("rig")) {
                 return Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
+                        .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+            if (sub.equals("platform")) {
+                List<String> suggestions = new ArrayList<>();
+                suggestions.add("set");
+                manager.getCurrentElection().ifPresent(election -> election.getNominees().forEach(uuid -> {
+                    String name = Bukkit.getOfflinePlayer(uuid).getName();
+                    if (name != null) suggestions.add(name);
+                }));
+                return suggestions.stream()
                         .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
             }

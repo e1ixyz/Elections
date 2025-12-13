@@ -92,6 +92,47 @@ public class ElectionManager {
         return ActionResult.ok(color("&aNominated &f" + displayName(target)));
     }
 
+    public ActionResult setPlatform(CommandSender sender, OfflinePlayer nominee, String platform) {
+        if (currentElection == null) {
+            return ActionResult.fail(msg("messages.no-election"));
+        }
+        if (!currentElection.isNominee(nominee.getUniqueId())) {
+            return ActionResult.fail(msg("messages.not-nominee"));
+        }
+        if (!currentElection.isActive()) {
+            return ActionResult.fail(color("&cElection already ended."));
+        }
+        if (sender instanceof Player player && !player.getUniqueId().equals(nominee.getUniqueId())
+                && !sender.hasPermission("elections.admin")) {
+            return ActionResult.fail(msg("messages.not-nominee"));
+        }
+        String trimmed = platform.trim();
+        if (trimmed.isEmpty()) {
+            return ActionResult.fail(color("&cPlatform cannot be empty."));
+        }
+        if (trimmed.length() > 256) {
+            trimmed = trimmed.substring(0, 256);
+        }
+        currentElection.setPlatform(nominee.getUniqueId(), trimmed);
+        return ActionResult.ok(msg("messages.platform-set").replace("%platform%", trimmed));
+    }
+
+    public ActionResult viewPlatform(OfflinePlayer nominee) {
+        if (currentElection == null) {
+            return ActionResult.fail(msg("messages.no-election"));
+        }
+        if (!currentElection.isNominee(nominee.getUniqueId())) {
+            return ActionResult.fail(msg("messages.not-nominee"));
+        }
+        Optional<String> platform = currentElection.getPlatform(nominee.getUniqueId());
+        if (platform.isEmpty()) {
+            return ActionResult.fail(msg("messages.platform-missing"));
+        }
+        return ActionResult.ok(msg("messages.platform-view")
+                .replace("%target%", displayName(nominee))
+                .replace("%platform%", platform.get()));
+    }
+
     public ActionResult vote(Player voter, OfflinePlayer target) {
         if (currentElection == null) {
             return ActionResult.fail(msg("messages.no-election"));
@@ -218,6 +259,7 @@ public class ElectionManager {
         }
         currentElection.setNominees(survivors);
         currentElection.clearVotesForNonNominees();
+        currentElection.prunePlatformsForNonNominees();
         currentElection.extend(Duration.ofHours(24));
 
         broadcast(msg("messages.tie-extended"));

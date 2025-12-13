@@ -18,6 +18,7 @@ public class Election {
     private Status status = Status.ACTIVE;
     private final LinkedHashSet<UUID> nominees = new LinkedHashSet<>();
     private final Map<UUID, UUID> votes = new HashMap<>();
+    private final Map<UUID, String> platforms = new HashMap<>();
     private UUID winner;
     private boolean commandsRan = false;
     private boolean announcedFinished = false;
@@ -85,6 +86,22 @@ public class Election {
     public void setNominees(List<UUID> nominees) {
         this.nominees.clear();
         this.nominees.addAll(nominees);
+    }
+
+    public void setPlatform(UUID nominee, String platform) {
+        this.platforms.put(nominee, platform);
+    }
+
+    public Optional<String> getPlatform(UUID nominee) {
+        return Optional.ofNullable(platforms.get(nominee));
+    }
+
+    public Map<UUID, String> getPlatforms() {
+        return Collections.unmodifiableMap(platforms);
+    }
+
+    public void prunePlatformsForNonNominees() {
+        platforms.keySet().removeIf(id -> !nominees.contains(id));
     }
 
     public void extend(Duration duration) {
