@@ -16,7 +16,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class ScoreboardService {
@@ -59,61 +58,53 @@ public class ScoreboardService {
         final int maxLines = 15;
         final boolean showVoteTip = plugin.getConfig().getBoolean("scoreboard.show-vote-tip", true);
         final boolean showPlatformTip = plugin.getConfig().getBoolean("scoreboard.show-platform-tip", true);
-        final boolean showWinnerLine = !election.isActive();
         final boolean showCounts = plugin.getConfig().getBoolean("scoreboard.show-vote-counts", true);
+        final boolean showWinnerLine = !election.isActive();
 
-        List<Line> lines = new ArrayList<>();
-        int highScore = 1_000_000; // keep headers above candidate lines
-        lines.add(new Line(color("&7&m----------------"), highScore--));
-        lines.add(new Line(color("&bRole: &f" + election.getRole()), highScore--));
+        List<String> lines = new ArrayList<>();
+        // Header
+        lines.add(color("&7&m----------------"));
+        lines.add(color("&bRole: &f" + election.getRole()));
         if (election.isActive()) {
             Duration remaining = election.getRemaining(java.time.Instant.now());
-            lines.add(new Line(color("&bEnds in: &f" + DurationUtil.format(remaining)), highScore--));
+            lines.add(color("&bEnds in: &f" + DurationUtil.format(remaining)));
         } else {
-            lines.add(new Line(color("&bStatus: &fFinished"), highScore--));
+            lines.add(color("&bStatus: &fFinished"));
         }
-        lines.add(new Line(color("&bNominees:"), highScore--));
+        lines.add(color("&bNominees:"));
 
-        Map<java.util.UUID, Long> voteCounts = election.getVoteCounts();
-        List<Line> candidateLines = new ArrayList<>();
-        int order = 0;
+        List<String> candidateLines = new ArrayList<>();
         for (java.util.UUID nominee : election.getNominees()) {
             OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(nominee);
-            long votes = voteCounts.getOrDefault(nominee, 0L);
+            long votes = election.getVoteCounts().getOrDefault(nominee, 0L);
             String display = offlinePlayer.getName() != null ? offlinePlayer.getName() : nominee.toString().substring(0, 8);
-            String text = color(" &7- &f" + display + (showCounts ? (" &7(" + votes + ")") : ""));
-            int score = showCounts ? (int) Math.min(votes, Integer.MAX_VALUE) : (500 - order); // stable order when counts are hidden
-            candidateLines.add(new Line(text, score));
-            order++;
+            candidateLines.add(color(" &7- &f" + display + (showCounts ? (" &7(" + votes + ")") : "")));
         }
 
         int optionalLines = (showVoteTip ? 1 : 0) + (showPlatformTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
-        int availableForCandidates = Math.max(0, maxLines - (lines.size() + optionalLines + 1 /*footer*/));
+        int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/;
+        int availableForCandidates = Math.max(0, maxLines - reserved);
         int configMax = plugin.getConfig().getInt("scoreboard.max-candidates", 10);
-        int toShow = Math.min(configMax, Math.min(candidateLines.size(), availableForCandidates));
+        int toShow = Math.min(candidateLines.size(), Math.min(configMax, availableForCandidates));
         boolean needsEllipsis = candidateLines.size() > toShow;
-        if (needsEllipsis && toShow == availableForCandidates) {
-            if (toShow > 1) {
-                toShow -= 1; // free a slot for the ellipsis while keeping at least one candidate line
-            } else {
-                needsEllipsis = false; // no room to show ellipsis without hiding all candidates
-            }
+        if (needsEllipsis && toShow == availableForCandidates && toShow > 0) {
+            // reserve a slot for the ellipsis without hiding all candidates
+            toShow = Math.max(1, toShow - 1);
         }
 
         if (candidateLines.isEmpty()) {
-            lines.add(new Line(color(" &7- None yet"), 0));
+            lines.add(color(" &7- None yet"));
         } else {
             for (int i = 0; i < toShow; i++) {
                 lines.add(candidateLines.get(i));
             }
             if (needsEllipsis) {
-                lines.add(new Line(color("&7..."), -5));
+                lines.add(color("&7..."));
             }
         }
 
-        int lowScore = -10; // keep tips/results at the bottom
         if (showVoteTip) {
-            lines.add(new Line(color("&bVote: &f/vote <name>"), lowScore--));
+            lines.add(color("&bVote: &f/vote <name>"));
         }
 
         if (showPlatformTip) {
@@ -122,7 +113,7 @@ public class ScoreboardService {
                     .filter(name -> name != null && !name.isBlank())
                     .findFirst()
                     .orElse("<name>");
-            lines.add(new Line(color("&bPlans: &f/elections platform " + example), lowScore--));
+            lines.add(color("&bPlans: &f/elections platform " + example));
         }
 
         if (!election.isActive()) {
@@ -130,33 +121,40 @@ public class ScoreboardService {
                 java.util.UUID winner = election.getWinner().get();
                 OfflinePlayer offline = Bukkit.getOfflinePlayer(winner);
                 String display = offline.getName() != null ? offline.getName() : winner.toString().substring(0, 8);
-                lines.add(new Line(color("&aWinner: &f" + display), lowScore--));
+                lines.add(color("&aWinner: &f" + display));
             } else {
-                lines.add(new Line(color("&aWinner: &fNone"), lowScore--));
+                lines.add(color("&aWinner: &fNone"));
             }
         }
 
-        lines.add(new Line(color("&7&m----------------"), lowScore--));
-        return uniquify(lines);
+        lines.add(color("&7&m----------------"));
+
+        List<String> unique = uniquify(lines);
+        List<Line> result = new ArrayList<>();
+        int score = unique.size();
+        for (String line : unique) {
+            result.add(new Line(line, score--));
+        }
+        return result;
     }
 
     private String color(String input) {
         return ChatColor.translateAlternateColorCodes('&', input);
     }
 
-    private List<Line> uniquify(List<Line> lines) {
+    private List<String> uniquify(List<String> lines) {
         Set<String> seen = new LinkedHashSet<>();
-        List<Line> unique = new ArrayList<>();
+        List<String> unique = new ArrayList<>();
         int colorIndex = 0;
         ChatColor[] palette = ChatColor.values();
-        for (Line line : lines) {
-            String candidate = line.text();
+        for (String line : lines) {
+            String candidate = line;
             while (seen.contains(candidate)) {
-                candidate = line.text() + palette[colorIndex % palette.length];
+                candidate = line + palette[colorIndex % palette.length];
                 colorIndex++;
             }
             seen.add(candidate);
-            unique.add(new Line(candidate, line.score()));
+            unique.add(candidate);
         }
         return unique;
     }

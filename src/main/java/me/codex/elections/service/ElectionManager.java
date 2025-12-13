@@ -293,7 +293,12 @@ public class ElectionManager {
     }
 
     private String msg(String path) {
-        return color(plugin.getConfig().getString(path, "&cMissing message: " + path));
+        String fallback = switch (path) {
+            case "messages.not-nominee" -> "&cYou must be a nominee to do that.";
+            case "messages.no-election" -> "&cThere is no active election right now.";
+            default -> "&cMissing message: " + path;
+        };
+        return color(plugin.getConfig().getString(path, fallback));
     }
 
     private void broadcast(String message) {
