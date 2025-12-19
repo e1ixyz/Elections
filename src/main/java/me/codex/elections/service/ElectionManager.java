@@ -207,12 +207,22 @@ public class ElectionManager {
             return;
         }
 
+        Map<UUID, Long> counts = currentElection.getVoteCounts();
+        long totalVotes = counts.values().stream().mapToLong(Long::longValue).sum();
         List<UUID> leaders = currentElection.getLeaders();
+
         if (leaders.size() >= 2) {
             handleTie(leaders);
             return;
         }
 
+        if (totalVotes == 0 && currentElection.getNominees().size() >= 2) {
+            // No votes cast but more than one nominee -> treat as tie and extend.
+            handleTie(new ArrayList<>(currentElection.getNominees()));
+            return;
+        }
+
+        // Single leader or only one nominee (with or without votes)
         conclude(false);
     }
 
@@ -229,6 +239,10 @@ public class ElectionManager {
                 topVotes = entry.getValue();
                 winner = entry.getKey();
             }
+        }
+        if (winner == null && currentElection.getNominees().size() == 1) {
+            winner = currentElection.getNominees().iterator().next();
+            topVotes = counts.getOrDefault(winner, 0L);
         }
 
         currentElection.setStatus(Election.Status.FINISHED);
@@ -296,6 +310,11 @@ public class ElectionManager {
         String fallback = switch (path) {
             case "messages.not-nominee" -> "&cYou must be a nominee to do that.";
             case "messages.no-election" -> "&cThere is no active election right now.";
+            case "messages.platform-set" -> "&aUpdated your platform: &f%platform%";
+            case "messages.platform-view" -> "&bPlatform for &f%target%&b: &f%platform%";
+            case "messages.platform-missing" -> "&eThat nominee has not set a platform yet.";
+            case "messages.already-nominated" -> "&eThat player is already nominated.";
+            case "messages.nomination-success" -> "&a%target% has been nominated for %role%!";
             default -> "&cMissing message: " + path;
         };
         return color(plugin.getConfig().getString(path, fallback));

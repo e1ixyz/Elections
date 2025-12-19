@@ -17,6 +17,7 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - `/vote <player>` — vote for a nominee.
 - `/elections platform <player>` — view a nominee's platform.
 - `/elections platform set <text>` — (nominees) set your platform/plan.
+- `/elections scoreboard` — toggle the election sidebar for yourself.
 - `/elections create <role> <duration>` — start an election (admin).
   - Duration formats: `1d2h`, `6h30m`, `45m`, `90s` etc.
 - `/elections rig <player>` — change all votes to a player (admin).
@@ -30,7 +31,7 @@ All other commands are available to everyone.
 - `scoreboard.title` — sidebar title.
 - `scoreboard.max-candidates` — cap visible nominees (ellipsis if more).
 - `scoreboard.show-vote-tip` — show `/vote` hint.
-- `scoreboard.show-platform-tip` — show `/elections platform <name>` hint.
+- `scoreboard.show-help-tip` — show `/elections` hint.
 - `scoreboard.show-vote-counts` — show numbers next to nominees.
 - `commands-on-win` — console commands run when a winner exists. Placeholders: `%winner%`, `%role%`.
 - `messages.*` — tweak player-facing messages.

@@ -23,7 +23,7 @@ public final class ElectionsPlugin extends JavaPlugin implements Listener {
 
         getServer().getPluginManager().registerEvents(this, this);
 
-        ElectionsCommand electionsCommand = new ElectionsCommand(electionManager);
+        ElectionsCommand electionsCommand = new ElectionsCommand(electionManager, scoreboardService);
         getCommand("elections").setExecutor(electionsCommand);
         getCommand("elections").setTabCompleter(electionsCommand);
 

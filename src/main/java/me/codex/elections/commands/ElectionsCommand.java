@@ -21,9 +21,11 @@ import java.util.stream.Collectors;
 public class ElectionsCommand implements CommandExecutor, TabCompleter {
 
     private final ElectionManager manager;
+    private final me.codex.elections.service.ScoreboardService scoreboardService;
 
-    public ElectionsCommand(ElectionManager manager) {
+    public ElectionsCommand(ElectionManager manager, me.codex.elections.service.ScoreboardService scoreboardService) {
         this.manager = manager;
+        this.scoreboardService = scoreboardService;
     }
 
     @Override
@@ -119,6 +121,20 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(result.message());
                 return true;
             }
+            case "scoreboard" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(ChatColor.RED + "Only players can toggle the scoreboard.");
+                    return true;
+                }
+                boolean nowEnabled = scoreboardService.toggle(player);
+                if (nowEnabled) {
+                    manager.getCurrentElection().ifPresent(election -> scoreboardService.showTo(player, election));
+                    sender.sendMessage(color("&aElection sidebar enabled."));
+                } else {
+                    sender.sendMessage(color("&eElection sidebar disabled."));
+                }
+                return true;
+            }
             default -> {
                 sendHelp(sender);
                 return true;
@@ -134,6 +150,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         lines.add(color("&7/elections nominate <player> &f- Nominate someone (not yourself)"));
         lines.add(color("&7/elections platform <player> &f- View a nominee's platform"));
         lines.add(color("&7/elections platform set <text> &f- (Nominees) Set your platform"));
+        lines.add(color("&7/elections scoreboard &f- Toggle the election sidebar"));
         lines.add(color("&7/vote <player> &f- Vote for a nominee"));
         if (sender.hasPermission("elections.admin")) {
             lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
@@ -150,7 +167,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform"));
+            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "scoreboard"));
             if (sender.hasPermission("elections.admin")) {
                 base.addAll(Arrays.asList("create", "rig", "end"));
             }

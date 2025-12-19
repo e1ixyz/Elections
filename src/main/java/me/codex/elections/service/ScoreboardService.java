@@ -14,6 +14,7 @@ import org.bukkit.scoreboard.Scoreboard;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -21,6 +22,7 @@ import java.util.Set;
 public class ScoreboardService {
 
     private final JavaPlugin plugin;
+    private final Set<java.util.UUID> hidden = new HashSet<>();
 
     public ScoreboardService(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -33,6 +35,9 @@ public class ScoreboardService {
     }
 
     public void showTo(Player player, Election election) {
+        if (hidden.contains(player.getUniqueId())) {
+            return;
+        }
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
         String title = ChatColor.translateAlternateColorCodes('&',
                 plugin.getConfig().getString("scoreboard.title", "&aElections"));
@@ -54,10 +59,36 @@ public class ScoreboardService {
         }
     }
 
+    public boolean toggle(Player player) {
+        if (hidden.remove(player.getUniqueId())) {
+            return true; // now enabled
+        }
+        hidden.add(player.getUniqueId());
+        player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        return false; // now disabled
+    }
+
+    public boolean enable(Player player) {
+        boolean changed = hidden.remove(player.getUniqueId());
+        return changed;
+    }
+
+    public boolean disable(Player player) {
+        boolean added = hidden.add(player.getUniqueId());
+        if (added) {
+            player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        }
+        return added;
+    }
+
+    public boolean isHidden(Player player) {
+        return hidden.contains(player.getUniqueId());
+    }
+
     private List<Line> buildLines(Election election) {
         final int maxLines = 15;
         final boolean showVoteTip = plugin.getConfig().getBoolean("scoreboard.show-vote-tip", true);
-        final boolean showPlatformTip = plugin.getConfig().getBoolean("scoreboard.show-platform-tip", true);
+        final boolean showHelpTip = plugin.getConfig().getBoolean("scoreboard.show-help-tip", true);
         final boolean showCounts = plugin.getConfig().getBoolean("scoreboard.show-vote-counts", true);
         final boolean showWinnerLine = !election.isActive();
 
@@ -81,7 +112,7 @@ public class ScoreboardService {
             candidateLines.add(color(" &7- &f" + display + (showCounts ? (" &7(" + votes + ")") : "")));
         }
 
-        int optionalLines = (showVoteTip ? 1 : 0) + (showPlatformTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
+        int optionalLines = (showVoteTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
         int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/;
         int availableForCandidates = Math.max(0, maxLines - reserved);
         int configMax = plugin.getConfig().getInt("scoreboard.max-candidates", 10);
@@ -107,13 +138,8 @@ public class ScoreboardService {
             lines.add(color("&bVote: &f/vote <name>"));
         }
 
-        if (showPlatformTip) {
-            String example = election.getNominees().stream()
-                    .map(uuid -> Bukkit.getOfflinePlayer(uuid).getName())
-                    .filter(name -> name != null && !name.isBlank())
-                    .findFirst()
-                    .orElse("<name>");
-            lines.add(color("&bPlans: &f/elections platform " + example));
+        if (showHelpTip) {
+            lines.add(color("&bCommands: &f/elections"));
         }
 
         if (!election.isActive()) {

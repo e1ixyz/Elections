@@ -3,7 +3,7 @@ scoreboard:
   max-candidates: 10
   show-vote-tip: true
   show-vote-counts: true
-  show-platform-tip: true
+  show-help-tip: true
 
 commands-on-win:
   - 'lp user %winner% meta addprefix 2 "JUDGE"'
