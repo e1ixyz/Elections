@@ -12,6 +12,11 @@ public class Election {
         FINISHED
     }
 
+    public enum Type {
+        REGULAR,
+        NO_CONFIDENCE
+    }
+
     private final String role;
     private final Instant startedAt;
     private Instant endsAt;
@@ -19,14 +24,20 @@ public class Election {
     private final LinkedHashSet<UUID> nominees = new LinkedHashSet<>();
     private final Map<UUID, UUID> votes = new HashMap<>();
     private final Map<UUID, String> platforms = new HashMap<>();
+    private final Type type;
     private UUID winner;
     private boolean commandsRan = false;
     private boolean announcedFinished = false;
 
     public Election(String role, Instant endsAt) {
+        this(role, endsAt, Type.REGULAR);
+    }
+
+    public Election(String role, Instant endsAt, Type type) {
         this.role = role;
         this.startedAt = Instant.now();
         this.endsAt = endsAt;
+        this.type = type;
     }
 
     public String getRole() {
@@ -63,6 +74,10 @@ public class Election {
 
     public boolean isActive() {
         return status == Status.ACTIVE;
+    }
+
+    public Type getType() {
+        return type;
     }
 
     public Duration getRemaining(Instant now) {

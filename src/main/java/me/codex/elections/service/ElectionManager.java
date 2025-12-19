@@ -18,6 +18,8 @@ public class ElectionManager {
     private final ElectionsPlugin plugin;
     private final ScoreboardService scoreboardService;
     private Election currentElection;
+    private UUID lastWinnerId;
+    private String lastRole;
     private int taskId = -1;
 
     public ElectionManager(ElectionsPlugin plugin, ScoreboardService scoreboardService) {
@@ -46,8 +48,21 @@ public class ElectionManager {
             return;
         }
 
-        if (currentElection.isActive() && Instant.now().isAfter(currentElection.getEndsAt())) {
-            concludeOrExtend();
+        if (currentElection.isActive()) {
+            if (currentElection.getType() == Election.Type.NO_CONFIDENCE) {
+                int required = getRequiredNoConfidenceVotes();
+                long votes = currentElection.getVoteCounts().values().stream().mapToLong(Long::longValue).sum();
+                if (votes >= required) {
+                    concludeNoConfidence(true, votes);
+                    return;
+                }
+                if (Instant.now().isAfter(currentElection.getEndsAt())) {
+                    concludeNoConfidence(false, votes);
+                    return;
+                }
+            } else if (Instant.now().isAfter(currentElection.getEndsAt())) {
+                concludeOrExtend();
+            }
         }
 
         scoreboardService.updateAll(currentElection);
@@ -63,7 +78,8 @@ public class ElectionManager {
         }
 
         Instant endsAt = Instant.now().plus(duration);
-        currentElection = new Election(role, endsAt);
+        currentElection = new Election(role, endsAt, Election.Type.REGULAR);
+        scoreboardService.resetHidden();
         broadcast(msg("messages.created")
                 .replace("%role%", role)
                 .replace("%duration%", DurationUtil.format(duration)));
@@ -92,9 +108,36 @@ public class ElectionManager {
         return ActionResult.ok(color("&aNominated &f" + displayName(target)));
     }
 
+    public ActionResult startNoConfidence(CommandSender sender, OfflinePlayer target) {
+        if (currentElection != null) {
+            return ActionResult.fail(color("&cAn election is already running. End it first."));
+        }
+        if (lastWinnerId == null || lastRole == null) {
+            return ActionResult.fail(msg("messages.no-confidence-unavailable"));
+        }
+        if (!target.getUniqueId().equals(lastWinnerId)) {
+            return ActionResult.fail(msg("messages.no-confidence-target").replace("%winner%", displayName(Bukkit.getOfflinePlayer(lastWinnerId))));
+        }
+
+        Duration duration = parseDurationOrDefault(plugin.getConfig().getString("no-confidence.duration", "24h"), Duration.ofHours(24));
+        Instant endsAt = Instant.now().plus(duration);
+        currentElection = new Election(lastRole, endsAt, Election.Type.NO_CONFIDENCE);
+        currentElection.addNominee(target.getUniqueId());
+        scoreboardService.resetHidden();
+        broadcast(msg("messages.no-confidence-started")
+                .replace("%role%", lastRole)
+                .replace("%target%", displayName(target))
+                .replace("%duration%", DurationUtil.format(duration)));
+        scoreboardService.updateAll(currentElection);
+        return ActionResult.ok(color("&aNo confidence vote started against &f" + displayName(target)));
+    }
+
     public ActionResult setPlatform(CommandSender sender, OfflinePlayer nominee, String platform) {
         if (currentElection == null) {
             return ActionResult.fail(msg("messages.no-election"));
+        }
+        if (currentElection.getType() == Election.Type.NO_CONFIDENCE) {
+            return ActionResult.fail(msg("messages.no-confidence-platform"));
         }
         if (!currentElection.isNominee(nominee.getUniqueId())) {
             return ActionResult.fail(msg("messages.not-nominee"));
@@ -120,6 +163,9 @@ public class ElectionManager {
     public ActionResult viewPlatform(OfflinePlayer nominee) {
         if (currentElection == null) {
             return ActionResult.fail(msg("messages.no-election"));
+        }
+        if (currentElection.getType() == Election.Type.NO_CONFIDENCE) {
+            return ActionResult.fail(msg("messages.no-confidence-platform"));
         }
         if (!currentElection.isNominee(nominee.getUniqueId())) {
             return ActionResult.fail(msg("messages.not-nominee"));
@@ -192,6 +238,7 @@ public class ElectionManager {
 
         StringBuilder builder = new StringBuilder();
         builder.append(color("&aRole: &f")).append(currentElection.getRole()).append("\n");
+        builder.append(color("&aType: &f")).append(currentElection.getType() == Election.Type.NO_CONFIDENCE ? "No Confidence" : "Election").append("\n");
         builder.append(color("&aStatus: &f")).append(currentElection.isActive() ? "Active" : "Finished").append("\n");
         if (currentElection.isActive()) {
             builder.append(color("&aEnds in: &f")).append(DurationUtil.format(currentElection.getRemaining(Instant.now()))).append("\n");
@@ -253,7 +300,54 @@ public class ElectionManager {
             currentElection.markAnnouncedFinished();
         }
 
-        runWinCommands(winner);
+        if (currentElection.getType() == Election.Type.NO_CONFIDENCE) {
+            if (winner != null) {
+                runNoConfidenceCommands(winner);
+                // Remove incumbent
+                lastWinnerId = null;
+                lastRole = currentElection.getRole();
+            }
+        } else {
+            runWinCommands(winner);
+            lastWinnerId = winner;
+            lastRole = currentElection.getRole();
+        }
+        scoreboardService.updateAll(currentElection);
+    }
+
+    private void concludeNoConfidence(boolean passed, long votes) {
+        if (currentElection == null) {
+            return;
+        }
+        if (currentElection.getType() != Election.Type.NO_CONFIDENCE) {
+            return;
+        }
+        currentElection.setStatus(Election.Status.FINISHED);
+        if (passed) {
+            UUID target = currentElection.getNominees().stream().findFirst().orElse(null);
+            currentElection.setWinner(target);
+            if (!currentElection.isAnnouncedFinished()) {
+                String name = target != null ? displayName(Bukkit.getOfflinePlayer(target)) : "Unknown";
+                broadcast(msg("messages.no-confidence-passed")
+                        .replace("%target%", name)
+                        .replace("%role%", currentElection.getRole())
+                        .replace("%votes%", String.valueOf(votes)));
+                currentElection.markAnnouncedFinished();
+            }
+            if (target != null) {
+                runNoConfidenceCommands(target);
+            }
+            lastWinnerId = null;
+        } else {
+            currentElection.setWinner(null);
+            if (!currentElection.isAnnouncedFinished()) {
+                broadcast(msg("messages.no-confidence-failed")
+                        .replace("%role%", currentElection.getRole())
+                        .replace("%needed%", String.valueOf(getRequiredNoConfidenceVotes()))
+                        .replace("%votes%", String.valueOf(votes)));
+                currentElection.markAnnouncedFinished();
+            }
+        }
         scoreboardService.updateAll(currentElection);
     }
 
@@ -306,6 +400,23 @@ public class ElectionManager {
         currentElection.markCommandsRan();
     }
 
+    private void runNoConfidenceCommands(UUID target) {
+        if (target == null || currentElection == null || currentElection.haveCommandsRun()) {
+            return;
+        }
+        List<String> commands = plugin.getConfig().getStringList("no-confidence.commands-on-pass");
+        if (commands.isEmpty()) {
+            return;
+        }
+        String targetName = displayName(Bukkit.getOfflinePlayer(target));
+        String role = currentElection.getRole();
+        for (String command : commands) {
+            String parsed = command.replace("%target%", targetName).replace("%role%", role);
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), parsed);
+        }
+        currentElection.markCommandsRan();
+    }
+
     private String msg(String path) {
         String fallback = switch (path) {
             case "messages.not-nominee" -> "&cYou must be a nominee to do that.";
@@ -315,6 +426,12 @@ public class ElectionManager {
             case "messages.platform-missing" -> "&eThat nominee has not set a platform yet.";
             case "messages.already-nominated" -> "&eThat player is already nominated.";
             case "messages.nomination-success" -> "&a%target% has been nominated for %role%!";
+            case "messages.no-confidence-started" -> "&eNo confidence vote started against %target% for %role% (%duration%).";
+            case "messages.no-confidence-unavailable" -> "&cNo winner is currently in office to challenge.";
+            case "messages.no-confidence-target" -> "&cOnly the current winner (%winner%) can face no confidence right now.";
+            case "messages.no-confidence-passed" -> "&cNo confidence passed against %target% for %role% with %votes% votes.";
+            case "messages.no-confidence-failed" -> "&aNo confidence failed for %role% (%votes%/%needed% votes).";
+            case "messages.no-confidence-platform" -> "&cPlatforms are disabled for no confidence votes.";
             default -> "&cMissing message: " + path;
         };
         return color(plugin.getConfig().getString(path, fallback));
@@ -331,6 +448,14 @@ public class ElectionManager {
     private String displayName(OfflinePlayer player) {
         String name = player.getName();
         return name != null ? name : player.getUniqueId().toString().substring(0, 8);
+    }
+
+    private Duration parseDurationOrDefault(String input, Duration fallback) {
+        return DurationUtil.parseDuration(input).orElse(fallback);
+    }
+
+    private int getRequiredNoConfidenceVotes() {
+        return Math.max(1, plugin.getConfig().getInt("no-confidence.required-votes", 6));
     }
 
     public record ActionResult(boolean success, String message) {

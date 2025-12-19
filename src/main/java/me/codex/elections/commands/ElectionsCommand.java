@@ -1,6 +1,8 @@
 package me.codex.elections.commands;
 
 import me.codex.elections.service.ElectionManager;
+import me.codex.elections.service.ScoreboardService;
+import org.bukkit.plugin.java.JavaPlugin;
 import me.codex.elections.util.DurationUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -21,11 +23,13 @@ import java.util.stream.Collectors;
 public class ElectionsCommand implements CommandExecutor, TabCompleter {
 
     private final ElectionManager manager;
-    private final me.codex.elections.service.ScoreboardService scoreboardService;
+    private final ScoreboardService scoreboardService;
+    private final JavaPlugin plugin;
 
-    public ElectionsCommand(ElectionManager manager, me.codex.elections.service.ScoreboardService scoreboardService) {
+    public ElectionsCommand(ElectionManager manager, ScoreboardService scoreboardService, JavaPlugin plugin) {
         this.manager = manager;
         this.scoreboardService = scoreboardService;
+        this.plugin = plugin;
     }
 
     @Override
@@ -121,6 +125,16 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(result.message());
                 return true;
             }
+            case "noconfidence" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " noconfidence <current-winner>");
+                    return true;
+                }
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                ElectionManager.ActionResult result = manager.startNoConfidence(sender, target);
+                sender.sendMessage(result.message());
+                return true;
+            }
             case "scoreboard" -> {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage(ChatColor.RED + "Only players can toggle the scoreboard.");
@@ -133,6 +147,16 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 } else {
                     sender.sendMessage(color("&eElection sidebar disabled."));
                 }
+                return true;
+            }
+            case "reload" -> {
+                if (!sender.hasPermission("elections.admin")) {
+                    sender.sendMessage(ChatColor.RED + "You do not have permission to do that.");
+                    return true;
+                }
+                plugin.reloadConfig();
+                sender.sendMessage(color("&aElections config reloaded."));
+                manager.getCurrentElection().ifPresent(election -> scoreboardService.updateAll(election));
                 return true;
             }
             default -> {
@@ -150,12 +174,14 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         lines.add(color("&7/elections nominate <player> &f- Nominate someone (not yourself)"));
         lines.add(color("&7/elections platform <player> &f- View a nominee's platform"));
         lines.add(color("&7/elections platform set <text> &f- (Nominees) Set your platform"));
+        lines.add(color("&7/elections noconfidence <winner> &f- Start a 24h vote of no confidence"));
         lines.add(color("&7/elections scoreboard &f- Toggle the election sidebar"));
         lines.add(color("&7/vote <player> &f- Vote for a nominee"));
         if (sender.hasPermission("elections.admin")) {
             lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
             lines.add(color("&7/elections rig <player> &f- Force all votes to this player"));
             lines.add(color("&7/elections end &f- Clear the election & scoreboard"));
+            lines.add(color("&7/elections reload &f- Reload config.yml"));
         }
         sender.sendMessage(lines.toArray(new String[0]));
     }
@@ -167,9 +193,9 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "scoreboard"));
+            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "noconfidence", "scoreboard"));
             if (sender.hasPermission("elections.admin")) {
-                base.addAll(Arrays.asList("create", "rig", "end"));
+                base.addAll(Arrays.asList("create", "rig", "end", "reload"));
             }
             return base.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
@@ -178,6 +204,12 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2) {
             String sub = args[0].toLowerCase();
             if (sub.equals("nominate") || sub.equals("rig")) {
+                return Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getName)
+                        .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+            if (sub.equals("noconfidence")) {
                 return Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))

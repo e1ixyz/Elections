@@ -9,6 +9,12 @@ commands-on-win:
   - 'lp user %winner% meta addprefix 2 "JUDGE"'
   - 'tellraw %winner% {"text":"You have been elected as Judge","color":"red"}'
 
+no-confidence:
+  duration: "24h"
+  required-votes: 6
+  commands-on-pass:
+    - 'tellraw %target% {"text":"A vote of no confidence has passed.","color":"red"}'
+
 messages:
   no-election: "&cThere is no active election right now."
   not-nominated: "&cThat player is not a nominee."
@@ -25,3 +31,9 @@ messages:
   platform-set: "&aUpdated your platform: &f%platform%"
   platform-view: "&bPlatform for &f%target%&b: &f%platform%"
   platform-missing: "&eThat nominee has not set a platform yet."
+  no-confidence-started: "&eVote of no confidence started against %target% for %role% (%duration%)."
+  no-confidence-unavailable: "&cNo current winner to challenge."
+  no-confidence-target: "&cOnly the current winner (%winner%) can face no confidence."
+  no-confidence-passed: "&cVote of no confidence passed against %target% for %role% with %votes% votes."
+  no-confidence-failed: "&aVote of no confidence failed for %role% (%votes%/%needed% votes)."
+  no-confidence-platform: "&cPlatforms are disabled for no confidence votes."

@@ -85,6 +85,10 @@ public class ScoreboardService {
         return hidden.contains(player.getUniqueId());
     }
 
+    public void resetHidden() {
+        hidden.clear();
+    }
+
     private List<Line> buildLines(Election election) {
         final int maxLines = 15;
         final boolean showVoteTip = plugin.getConfig().getBoolean("scoreboard.show-vote-tip", true);
@@ -95,7 +99,16 @@ public class ScoreboardService {
         List<String> lines = new ArrayList<>();
         // Header
         lines.add(color("&7&m----------------"));
-        lines.add(color("&bRole: &f" + election.getRole()));
+        String roleLine = election.getType() == Election.Type.NO_CONFIDENCE
+                ? "&bNo Confidence: &f" + election.getRole()
+                : "&bRole: &f" + election.getRole();
+        lines.add(color(roleLine));
+        if (election.getType() == Election.Type.NO_CONFIDENCE) {
+            election.getNominees().stream().findFirst().ifPresent(target -> {
+                String name = Bukkit.getOfflinePlayer(target).getName();
+                lines.add(color("&bTarget: &f" + (name != null ? name : target.toString().substring(0, 8))));
+            });
+        }
         if (election.isActive()) {
             Duration remaining = election.getRemaining(java.time.Instant.now());
             lines.add(color("&bEnds in: &f" + DurationUtil.format(remaining)));
@@ -113,7 +126,8 @@ public class ScoreboardService {
         }
 
         int optionalLines = (showVoteTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
-        int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/;
+        int extraStatic = election.getType() == Election.Type.NO_CONFIDENCE ? 1 : 0; // target line
+        int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/ + extraStatic;
         int availableForCandidates = Math.max(0, maxLines - reserved);
         int configMax = plugin.getConfig().getInt("scoreboard.max-candidates", 10);
         int toShow = Math.min(candidateLines.size(), Math.min(configMax, availableForCandidates));
