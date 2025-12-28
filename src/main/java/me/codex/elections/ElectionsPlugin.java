@@ -31,12 +31,14 @@ public final class ElectionsPlugin extends JavaPlugin implements Listener {
         getCommand("vote").setExecutor(voteCommand);
         getCommand("vote").setTabCompleter(voteCommand);
 
+        electionManager.loadState();
         electionManager.startTicking();
     }
 
     @Override
     public void onDisable() {
         if (electionManager != null) {
+            electionManager.saveState();
             electionManager.stopTicking();
         }
         if (scoreboardService != null) {

@@ -86,6 +86,20 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(result.message());
                 return true;
             }
+            case "unnominate" -> {
+                if (!sender.hasPermission("elections.admin")) {
+                    sender.sendMessage(ChatColor.RED + "You do not have permission to do that.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /" + label + " unnominate <player>");
+                    return true;
+                }
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                ElectionManager.ActionResult result = manager.unnominate(sender, target);
+                sender.sendMessage(result.message());
+                return true;
+            }
             case "end" -> {
                 if (!sender.hasPermission("elections.admin")) {
                     sender.sendMessage(ChatColor.RED + "You do not have permission to do that.");
@@ -180,6 +194,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         if (sender.hasPermission("elections.admin")) {
             lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
             lines.add(color("&7/elections rig <player> &f- Force all votes to this player"));
+            lines.add(color("&7/elections unnominate <player> &f- Remove a nominee"));
             lines.add(color("&7/elections end &f- Clear the election & scoreboard"));
             lines.add(color("&7/elections reload &f- Reload config.yml"));
         }
@@ -195,7 +210,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "noconfidence", "scoreboard"));
             if (sender.hasPermission("elections.admin")) {
-                base.addAll(Arrays.asList("create", "rig", "end", "reload"));
+                base.addAll(Arrays.asList("create", "rig", "unnominate", "end", "reload"));
             }
             return base.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
@@ -210,6 +225,12 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                         .collect(Collectors.toList());
             }
             if (sub.equals("noconfidence")) {
+                return Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getName)
+                        .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+            if (sub.equals("unnominate")) {
                 return Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))

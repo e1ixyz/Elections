@@ -24,6 +24,7 @@ public class Election {
     private final LinkedHashSet<UUID> nominees = new LinkedHashSet<>();
     private final Map<UUID, UUID> votes = new HashMap<>();
     private final Map<UUID, String> platforms = new HashMap<>();
+    private final Map<UUID, Set<UUID>> nominationsBy = new HashMap<>();
     private final Type type;
     private UUID winner;
     private boolean commandsRan = false;
@@ -103,6 +104,33 @@ public class Election {
         this.nominees.addAll(nominees);
     }
 
+    public boolean removeNominee(UUID nominee) {
+        boolean removed = this.nominees.remove(nominee);
+        if (removed) {
+            this.votes.entrySet().removeIf(entry -> entry.getValue().equals(nominee));
+            this.platforms.remove(nominee);
+            this.nominationsBy.values().forEach(set -> set.remove(nominee));
+        }
+        return removed;
+    }
+
+    public void recordNomination(UUID nominator, UUID nominee) {
+        this.nominationsBy.computeIfAbsent(nominator, k -> new HashSet<>()).add(nominee);
+    }
+
+    public int getNominationCount(UUID nominator) {
+        return this.nominationsBy.getOrDefault(nominator, Collections.emptySet()).size();
+    }
+
+    public Map<UUID, Set<UUID>> getNominationsBy() {
+        return Collections.unmodifiableMap(nominationsBy);
+    }
+
+    public void setNominationsBy(Map<UUID, Set<UUID>> data) {
+        this.nominationsBy.clear();
+        data.forEach((k, v) -> this.nominationsBy.put(k, new HashSet<>(v)));
+    }
+
     public void setPlatform(UUID nominee, String platform) {
         this.platforms.put(nominee, platform);
     }
@@ -157,11 +185,19 @@ public class Election {
         this.commandsRan = true;
     }
 
+    public void setCommandsRan(boolean ran) {
+        this.commandsRan = ran;
+    }
+
     public boolean isAnnouncedFinished() {
         return announcedFinished;
     }
 
     public void markAnnouncedFinished() {
         this.announcedFinished = true;
+    }
+
+    public void setAnnouncedFinished(boolean value) {
+        this.announcedFinished = value;
     }
 }

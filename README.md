@@ -10,6 +10,8 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - Admin rig command, manual end, and automatic 24h tie extensions between top two until a winner.
 - Console commands on win with `%winner%` and `%role%` placeholders.
 - Vote of no confidence: players can start a 24h no-confidence vote against the current winner; configurable vote requirement; runs its own console commands on pass.
+- Persistent elections: active elections/no-confidence votes and last winner info survive restarts.
+- Per-player nomination cap (configurable) and admin unnominate control.
 
 ## Commands
 - `/elections` or `/elections help` — show help.
@@ -23,6 +25,7 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - `/elections create <role> <duration>` — start an election (admin).
   - Duration formats: `1d2h`, `6h30m`, `45m`, `90s` etc.
 - `/elections rig <player>` — change all votes to a player (admin).
+- `/elections unnominate <player>` — remove a nominee (admin).
 - `/elections end` — end/clear the election and scoreboard (admin).
 - `/elections reload` — reload `config.yml` (admin).
 
@@ -37,6 +40,7 @@ All other commands are available to everyone.
 - `scoreboard.show-help-tip` — show `/elections` hint.
 - `scoreboard.show-vote-counts` — show numbers next to nominees.
 - `commands-on-win` — console commands run when a winner exists. Placeholders: `%winner%`, `%role%`.
+- `nominations.max-per-player` — per-player nomination limit each election.
 - `no-confidence.duration` — default duration for no confidence votes (e.g., `24h`).
 - `no-confidence.required-votes` — number of votes needed to pass.
 - `no-confidence.commands-on-pass` — console commands run when a no confidence passes. Placeholders: `%target%`, `%role%`.

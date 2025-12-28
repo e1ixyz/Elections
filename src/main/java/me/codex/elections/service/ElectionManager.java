@@ -3,6 +3,8 @@ package me.codex.elections.service;
 import me.codex.elections.ElectionsPlugin;
 import me.codex.elections.model.Election;
 import me.codex.elections.util.DurationUtil;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
@@ -12,6 +14,8 @@ import org.bukkit.entity.Player;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.io.File;
+import java.io.IOException;
 
 public class ElectionManager {
 
@@ -43,6 +47,131 @@ public class ElectionManager {
         }
     }
 
+    public void loadState() {
+        File file = new File(plugin.getDataFolder(), "state.yml");
+        if (!file.exists()) {
+            return;
+        }
+        YamlConfiguration yaml = new YamlConfiguration();
+        try {
+            yaml.load(file);
+        } catch (IOException | InvalidConfigurationException e) {
+            plugin.getLogger().warning("Failed to load election state: " + e.getMessage());
+            return;
+        }
+
+        String lastWinnerStr = yaml.getString("last.winner");
+        this.lastWinnerId = lastWinnerStr != null ? UUID.fromString(lastWinnerStr) : null;
+        this.lastRole = yaml.getString("last.role", null);
+
+        if (!yaml.isConfigurationSection("current")) {
+            return;
+        }
+        String role = yaml.getString("current.role");
+        String typeStr = yaml.getString("current.type", Election.Type.REGULAR.name());
+        String statusStr = yaml.getString("current.status", Election.Status.ACTIVE.name());
+        long endsAt = yaml.getLong("current.endsAt", 0L);
+        long startedAt = yaml.getLong("current.startedAt", System.currentTimeMillis());
+
+        Election.Type type = Election.Type.valueOf(typeStr);
+        Election.Status status = Election.Status.valueOf(statusStr);
+        Election election = new Election(role, Instant.ofEpochMilli(endsAt), type);
+        election.setStatus(status);
+
+        List<String> nominees = yaml.getStringList("current.nominees");
+        nominees.forEach(n -> election.addNominee(UUID.fromString(n)));
+
+        // votes
+        if (yaml.isConfigurationSection("current.votes")) {
+            for (String voter : yaml.getConfigurationSection("current.votes").getKeys(false)) {
+                String candidate = yaml.getString("current.votes." + voter);
+                if (candidate != null) {
+                    election.getVotes().put(UUID.fromString(voter), UUID.fromString(candidate));
+                }
+            }
+        }
+
+        // platforms
+        if (yaml.isConfigurationSection("current.platforms")) {
+            for (String nominee : yaml.getConfigurationSection("current.platforms").getKeys(false)) {
+                String text = yaml.getString("current.platforms." + nominee);
+                if (text != null) {
+                    election.setPlatform(UUID.fromString(nominee), text);
+                }
+            }
+        }
+
+        // nominations map
+        if (yaml.isConfigurationSection("current.nominations")) {
+            Map<UUID, Set<UUID>> nominations = new HashMap<>();
+            for (String nominator : yaml.getConfigurationSection("current.nominations").getKeys(false)) {
+                List<String> targets = yaml.getStringList("current.nominations." + nominator);
+                Set<UUID> set = new HashSet<>();
+                targets.forEach(t -> set.add(UUID.fromString(t)));
+                nominations.put(UUID.fromString(nominator), set);
+            }
+            election.setNominationsBy(nominations);
+        }
+
+        String winnerStr = yaml.getString("current.winner");
+        if (winnerStr != null && !winnerStr.isBlank()) {
+            election.setWinner(UUID.fromString(winnerStr));
+        }
+        election.setCommandsRan(yaml.getBoolean("current.commandsRan", false));
+        election.setAnnouncedFinished(yaml.getBoolean("current.announcedFinished", false));
+
+        this.currentElection = election;
+        scoreboardService.updateAll(election);
+    }
+
+    public void saveState() {
+        if (!plugin.getDataFolder().exists()) {
+            plugin.getDataFolder().mkdirs();
+        }
+        File file = new File(plugin.getDataFolder(), "state.yml");
+        YamlConfiguration yaml = new YamlConfiguration();
+
+        if (lastWinnerId != null) {
+            yaml.set("last.winner", lastWinnerId.toString());
+        }
+        if (lastRole != null) {
+            yaml.set("last.role", lastRole);
+        }
+
+        if (currentElection != null) {
+            Election e = currentElection;
+            yaml.set("current.role", e.getRole());
+            yaml.set("current.type", e.getType().name());
+            yaml.set("current.status", e.getStatus().name());
+            yaml.set("current.startedAt", e.getStartedAt().toEpochMilli());
+            yaml.set("current.endsAt", e.getEndsAt().toEpochMilli());
+            yaml.set("current.nominees", e.getNominees().stream().map(UUID::toString).toList());
+            yaml.set("current.commandsRan", e.haveCommandsRun());
+            yaml.set("current.announcedFinished", e.isAnnouncedFinished());
+            e.getWinner().ifPresent(w -> yaml.set("current.winner", w.toString()));
+
+            Map<String, String> votes = new HashMap<>();
+            e.getVotes().forEach((voter, candidate) -> votes.put(voter.toString(), candidate.toString()));
+            yaml.createSection("current.votes", votes);
+
+            Map<String, String> platforms = new HashMap<>();
+            e.getPlatforms().forEach((nominee, platform) -> platforms.put(nominee.toString(), platform));
+            yaml.createSection("current.platforms", platforms);
+
+            Map<String, List<String>> nominations = new HashMap<>();
+            e.getNominationsBy().forEach((nominator, set) -> nominations.put(
+                    nominator.toString(),
+                    set.stream().map(UUID::toString).toList()
+            ));
+            yaml.createSection("current.nominations", nominations);
+        }
+
+        try {
+            yaml.save(file);
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to save election state: " + ex.getMessage());
+        }
+    }
     private void tick() {
         if (currentElection == null) {
             return;
@@ -100,7 +229,17 @@ public class ElectionManager {
         if (currentElection.isNominee(target.getUniqueId())) {
             return ActionResult.fail(msg("messages.already-nominated"));
         }
+        if (nominator instanceof Player player && !nominator.hasPermission("elections.admin")) {
+            int maxNoms = Math.max(1, plugin.getConfig().getInt("nominations.max-per-player", 1));
+            int used = currentElection.getNominationCount(player.getUniqueId());
+            if (used >= maxNoms) {
+                return ActionResult.fail(msg("messages.nomination-limit").replace("%max%", String.valueOf(maxNoms)));
+            }
+        }
         currentElection.addNominee(target.getUniqueId());
+        if (nominator instanceof Player player) {
+            currentElection.recordNomination(player.getUniqueId(), target.getUniqueId());
+        }
         broadcast(msg("messages.nomination-success")
                 .replace("%target%", displayName(target))
                 .replace("%role%", currentElection.getRole()));
@@ -215,6 +354,23 @@ public class ElectionManager {
         }
         scoreboardService.updateAll(currentElection);
         return ActionResult.ok(msg("messages.rigged").replace("%winner%", displayName(target)));
+    }
+
+    public ActionResult unnominate(CommandSender sender, OfflinePlayer target) {
+        if (currentElection == null) {
+            return ActionResult.fail(msg("messages.no-election"));
+        }
+        if (!currentElection.isActive()) {
+            return ActionResult.fail(color("&cCannot unnominate after the election has ended."));
+        }
+        boolean removed = currentElection.removeNominee(target.getUniqueId());
+        if (!removed) {
+            return ActionResult.fail(msg("messages.unnominate-missing"));
+        }
+        currentElection.clearVotesForNonNominees();
+        currentElection.prunePlatformsForNonNominees();
+        scoreboardService.updateAll(currentElection);
+        return ActionResult.ok(msg("messages.unnominate-success").replace("%target%", displayName(target)));
     }
 
     public ActionResult endElection() {

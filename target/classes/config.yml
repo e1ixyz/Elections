@@ -9,6 +9,9 @@ commands-on-win:
   - 'lp user %winner% meta addprefix 2 "JUDGE"'
   - 'tellraw %winner% {"text":"You have been elected as Judge","color":"red"}'
 
+nominations:
+  max-per-player: 1
+
 no-confidence:
   duration: "24h"
   required-votes: 6
@@ -31,6 +34,9 @@ messages:
   platform-set: "&aUpdated your platform: &f%platform%"
   platform-view: "&bPlatform for &f%target%&b: &f%platform%"
   platform-missing: "&eThat nominee has not set a platform yet."
+  nomination-limit: "&cYou cannot nominate more than %max% player(s) this election."
+  unnominate-success: "&aRemoved nominee %target%."
+  unnominate-missing: "&cThat player is not a current nominee."
   no-confidence-started: "&eVote of no confidence started against %target% for %role% (%duration%)."
   no-confidence-unavailable: "&cNo current winner to challenge."
   no-confidence-target: "&cOnly the current winner (%winner%) can face no confidence."
