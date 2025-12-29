@@ -173,6 +173,10 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
                 manager.getCurrentElection().ifPresent(election -> scoreboardService.updateAll(election));
                 return true;
             }
+            case "admin" -> {
+                sendAdminHelp(sender);
+                return true;
+            }
             default -> {
                 sendHelp(sender);
                 return true;
@@ -191,13 +195,18 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
         lines.add(color("&7/elections noconfidence <winner> &f- Start a 24h vote of no confidence"));
         lines.add(color("&7/elections scoreboard &f- Toggle the election sidebar"));
         lines.add(color("&7/vote <player> &f- Vote for a nominee"));
-        if (sender.hasPermission("elections.admin")) {
-            lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
-            lines.add(color("&7/elections rig <player> &f- Force all votes to this player"));
-            lines.add(color("&7/elections unnominate <player> &f- Remove a nominee"));
-            lines.add(color("&7/elections end &f- Clear the election & scoreboard"));
-            lines.add(color("&7/elections reload &f- Reload config.yml"));
-        }
+        lines.add(color("&7/elections admin &f- Admin command list"));
+        sender.sendMessage(lines.toArray(new String[0]));
+    }
+
+    private void sendAdminHelp(CommandSender sender) {
+        List<String> lines = new ArrayList<>();
+        lines.add(color("&cAdmin commands:"));
+        lines.add(color("&7/elections create <role> <duration> &f- Start a new election"));
+        lines.add(color("&7/elections rig <player> &f- Force all votes to this player"));
+        lines.add(color("&7/elections unnominate <player> &f- Remove a nominee"));
+        lines.add(color("&7/elections end &f- Clear the election & scoreboard"));
+        lines.add(color("&7/elections reload &f- Reload config.yml"));
         sender.sendMessage(lines.toArray(new String[0]));
     }
 
@@ -208,7 +217,7 @@ public class ElectionsCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "noconfidence", "scoreboard"));
+            List<String> base = new ArrayList<>(Arrays.asList("help", "status", "nominate", "platform", "noconfidence", "scoreboard", "admin"));
             if (sender.hasPermission("elections.admin")) {
                 base.addAll(Arrays.asList("create", "rig", "unnominate", "end", "reload"));
             }

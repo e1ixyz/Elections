@@ -223,6 +223,9 @@ public class ElectionManager {
         if (!currentElection.isActive()) {
             return ActionResult.fail(color("&cThis election already ended. Use /elections end to clear it."));
         }
+        if (plugin.getServer().getPlayer(target.getUniqueId()) == null || !target.isOnline()) {
+            return ActionResult.fail(msg("messages.nomination-offline"));
+        }
         if (nominator instanceof Player player && player.getUniqueId().equals(target.getUniqueId())) {
             return ActionResult.fail(msg("messages.cannot-self-nominate"));
         }
@@ -582,6 +585,7 @@ public class ElectionManager {
             case "messages.platform-missing" -> "&eThat nominee has not set a platform yet.";
             case "messages.already-nominated" -> "&eThat player is already nominated.";
             case "messages.nomination-success" -> "&a%target% has been nominated for %role%!";
+            case "messages.nomination-offline" -> "&cYou can only nominate online players.";
             case "messages.no-confidence-started" -> "&eNo confidence vote started against %target% for %role% (%duration%).";
             case "messages.no-confidence-unavailable" -> "&cNo winner is currently in office to challenge.";
             case "messages.no-confidence-target" -> "&cOnly the current winner (%winner%) can face no confidence right now.";

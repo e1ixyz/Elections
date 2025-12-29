@@ -2,6 +2,7 @@ scoreboard:
   title: "&a&lElections"
   max-candidates: 10
   show-vote-tip: true
+  show-platform-tip: true
   show-vote-counts: true
   show-help-tip: true
 
@@ -31,6 +32,7 @@ messages:
   rigged: "&cVotes have been rigged for %winner%."
   tie-extended: "&eElection was tied. Extending by 24h for top two candidates."
   not-nominee: "&cYou must be a nominee to do that."
+  nomination-offline: "&cYou can only nominate online players."
   platform-set: "&aUpdated your platform: &f%platform%"
   platform-view: "&bPlatform for &f%target%&b: &f%platform%"
   platform-missing: "&eThat nominee has not set a platform yet."

@@ -22,6 +22,7 @@ Simple elections for arbitrary roles (e.g., Judge) with live scoreboard, tie han
 - `/elections platform set <text>` — (nominees) set your platform/plan.
 - `/elections scoreboard` — toggle the election sidebar for yourself.
 - `/elections noconfidence <winner>` — start a 24h vote of no confidence against the current winner.
+- `/elections admin` — list admin commands.
 - `/elections create <role> <duration>` — start an election (admin).
   - Duration formats: `1d2h`, `6h30m`, `45m`, `90s` etc.
 - `/elections rig <player>` — change all votes to a player (admin).

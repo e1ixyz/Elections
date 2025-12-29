@@ -92,6 +92,7 @@ public class ScoreboardService {
     private List<Line> buildLines(Election election) {
         final int maxLines = 15;
         final boolean showVoteTip = plugin.getConfig().getBoolean("scoreboard.show-vote-tip", true);
+        final boolean showPlatformTip = plugin.getConfig().getBoolean("scoreboard.show-platform-tip", true);
         final boolean showHelpTip = plugin.getConfig().getBoolean("scoreboard.show-help-tip", true);
         final boolean showCounts = plugin.getConfig().getBoolean("scoreboard.show-vote-counts", true);
         final boolean showWinnerLine = !election.isActive();
@@ -125,7 +126,7 @@ public class ScoreboardService {
             candidateLines.add(color(" &7- &f" + display + (showCounts ? (" &7(" + votes + ")") : "")));
         }
 
-        int optionalLines = (showVoteTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
+        int optionalLines = (showVoteTip ? 1 : 0) + (showPlatformTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
         int extraStatic = election.getType() == Election.Type.NO_CONFIDENCE ? 1 : 0; // target line
         int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/ + extraStatic;
         int availableForCandidates = Math.max(0, maxLines - reserved);
@@ -150,6 +151,10 @@ public class ScoreboardService {
 
         if (showVoteTip) {
             lines.add(color("&bVote: &f/vote <name>"));
+        }
+
+        if (showPlatformTip) {
+            lines.add(color("&bPlatform: &f/elections platform"));
         }
 
         if (showHelpTip) {
