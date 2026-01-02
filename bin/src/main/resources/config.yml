@@ -2,6 +2,7 @@ scoreboard:
   title: "&a&lElections"
   max-candidates: 10
   show-vote-tip: true
+  show-platform-tip: true
   show-vote-counts: true
   show-help-tip: true
 
@@ -11,10 +12,6 @@ commands-on-win:
 
 nominations:
   max-per-player: 1
-
-voting:
-  max-changes: 2
-  required-playtime-hours: 12
 
 no-confidence:
   duration: "24h"

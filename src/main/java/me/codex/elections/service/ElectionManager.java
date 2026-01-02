@@ -10,6 +10,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.Statistic;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -101,6 +102,15 @@ public class ElectionManager {
             }
         }
 
+        // vote changes
+        if (yaml.isConfigurationSection("current.voteChanges")) {
+            Map<UUID, Integer> changes = new HashMap<>();
+            for (String voter : yaml.getConfigurationSection("current.voteChanges").getKeys(false)) {
+                changes.put(UUID.fromString(voter), yaml.getInt("current.voteChanges." + voter, 0));
+            }
+            election.setVoteChanges(changes);
+        }
+
         // nominations map
         if (yaml.isConfigurationSection("current.nominations")) {
             Map<UUID, Set<UUID>> nominations = new HashMap<>();
@@ -157,6 +167,10 @@ public class ElectionManager {
             Map<String, String> platforms = new HashMap<>();
             e.getPlatforms().forEach((nominee, platform) -> platforms.put(nominee.toString(), platform));
             yaml.createSection("current.platforms", platforms);
+
+            Map<String, Integer> changes = new HashMap<>();
+            e.getVoteChanges().forEach((voter, count) -> changes.put(voter.toString(), count));
+            yaml.createSection("current.voteChanges", changes);
 
             Map<String, List<String>> nominations = new HashMap<>();
             e.getNominationsBy().forEach((nominator, set) -> nominations.put(
@@ -328,6 +342,14 @@ public class ElectionManager {
         if (!currentElection.isActive()) {
             return ActionResult.fail(color("&cVoting is closed. Results are being displayed."));
         }
+        int requiredHours = plugin.getConfig().getInt("voting.required-playtime-hours", 12);
+        long ticksPlayed = voter.getStatistic(Statistic.PLAY_ONE_MINUTE);
+        long hoursPlayed = ticksPlayed / 72000;
+        if (hoursPlayed < requiredHours) {
+            return ActionResult.fail(msg("messages.vote-playtime")
+                    .replace("%needed%", String.valueOf(requiredHours))
+                    .replace("%have%", String.valueOf(hoursPlayed)));
+        }
         if (!currentElection.isNominee(target.getUniqueId())) {
             return ActionResult.fail(msg("messages.not-nominated"));
         }
@@ -337,6 +359,16 @@ public class ElectionManager {
 
         if (previous != null && previous.equals(target.getUniqueId())) {
             return ActionResult.ok(color("&eYou already voted for &f" + displayName(target) + "&e."));
+        }
+        if (previous != null && !previous.equals(target.getUniqueId())) {
+            int maxChanges = Math.max(0, plugin.getConfig().getInt("voting.max-changes", 2));
+            int used = currentElection.getVoteChanges(voter.getUniqueId());
+            if (used >= maxChanges) {
+                // Revert the vote change
+                currentElection.getVotes().put(voter.getUniqueId(), previous);
+                return ActionResult.fail(msg("messages.vote-change-limit").replace("%max%", String.valueOf(maxChanges)));
+            }
+            currentElection.incrementVoteChange(voter.getUniqueId());
         }
         String path = previous == null ? "messages.vote-accepted" : "messages.vote-updated";
         return ActionResult.ok(msg(path).replace("%candidate%", displayName(target)));
@@ -586,6 +618,8 @@ public class ElectionManager {
             case "messages.already-nominated" -> "&eThat player is already nominated.";
             case "messages.nomination-success" -> "&a%target% has been nominated for %role%!";
             case "messages.nomination-offline" -> "&cYou can only nominate online players.";
+            case "messages.vote-change-limit" -> "&cYou have reached the vote change limit (%max%).";
+            case "messages.vote-playtime" -> "&cYou need %needed% hours of playtime to vote. You have %have% hours.";
             case "messages.no-confidence-started" -> "&eNo confidence vote started against %target% for %role% (%duration%).";
             case "messages.no-confidence-unavailable" -> "&cNo winner is currently in office to challenge.";
             case "messages.no-confidence-target" -> "&cOnly the current winner (%winner%) can face no confidence right now.";

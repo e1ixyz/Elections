@@ -92,14 +92,12 @@ public class ScoreboardService {
     private List<Line> buildLines(Election election) {
         final int maxLines = 15;
         final boolean showVoteTip = plugin.getConfig().getBoolean("scoreboard.show-vote-tip", true);
-        final boolean showPlatformTip = plugin.getConfig().getBoolean("scoreboard.show-platform-tip", true);
         final boolean showHelpTip = plugin.getConfig().getBoolean("scoreboard.show-help-tip", true);
         final boolean showCounts = plugin.getConfig().getBoolean("scoreboard.show-vote-counts", true);
         final boolean showWinnerLine = !election.isActive();
 
         List<String> lines = new ArrayList<>();
         // Header
-        lines.add(color("&7&m----------------"));
         String roleLine = election.getType() == Election.Type.NO_CONFIDENCE
                 ? "&bNo Confidence: &f" + election.getRole()
                 : "&bRole: &f" + election.getRole();
@@ -126,9 +124,9 @@ public class ScoreboardService {
             candidateLines.add(color(" &7- &f" + display + (showCounts ? (" &7(" + votes + ")") : "")));
         }
 
-        int optionalLines = (showVoteTip ? 1 : 0) + (showPlatformTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
+        int optionalLines = (showVoteTip ? 1 : 0) + (showHelpTip ? 1 : 0) + (showWinnerLine ? 1 : 0);
         int extraStatic = election.getType() == Election.Type.NO_CONFIDENCE ? 1 : 0; // target line
-        int reserved = 4 /*header*/ + optionalLines + 1 /*footer*/ + extraStatic;
+        int reserved = 3 /*role/status*/ + 1 /*nominees label*/ + optionalLines + extraStatic;
         int availableForCandidates = Math.max(0, maxLines - reserved);
         int configMax = plugin.getConfig().getInt("scoreboard.max-candidates", 10);
         int toShow = Math.min(candidateLines.size(), Math.min(configMax, availableForCandidates));
@@ -153,10 +151,6 @@ public class ScoreboardService {
             lines.add(color("&bVote: &f/vote <name>"));
         }
 
-        if (showPlatformTip) {
-            lines.add(color("&bPlatform: &f/elections platform"));
-        }
-
         if (showHelpTip) {
             lines.add(color("&bCommands: &f/elections"));
         }
@@ -171,8 +165,6 @@ public class ScoreboardService {
                 lines.add(color("&aWinner: &fNone"));
             }
         }
-
-        lines.add(color("&7&m----------------"));
 
         List<String> unique = uniquify(lines);
         List<Line> result = new ArrayList<>();

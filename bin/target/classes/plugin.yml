@@ -1,0 +1,18 @@
+name: Elections
+version: ${project.version}
+main: me.codex.elections.ElectionsPlugin
+api-version: '1.21'
+authors:
+  - e1ixyz
+commands:
+  elections:
+    description: Manage elections
+    usage: /elections help
+    aliases: [election]
+  vote:
+    description: Vote for a candidate in the current election
+    usage: /vote <player>
+permissions:
+  elections.admin:
+    description: Allows managing elections
+    default: op

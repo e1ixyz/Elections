@@ -25,6 +25,7 @@ public class Election {
     private final Map<UUID, UUID> votes = new HashMap<>();
     private final Map<UUID, String> platforms = new HashMap<>();
     private final Map<UUID, Set<UUID>> nominationsBy = new HashMap<>();
+    private final Map<UUID, Integer> voteChanges = new HashMap<>();
     private final Type type;
     private UUID winner;
     private boolean commandsRan = false;
@@ -129,6 +130,23 @@ public class Election {
     public void setNominationsBy(Map<UUID, Set<UUID>> data) {
         this.nominationsBy.clear();
         data.forEach((k, v) -> this.nominationsBy.put(k, new HashSet<>(v)));
+    }
+
+    public int getVoteChanges(UUID voter) {
+        return voteChanges.getOrDefault(voter, 0);
+    }
+
+    public void incrementVoteChange(UUID voter) {
+        voteChanges.put(voter, getVoteChanges(voter) + 1);
+    }
+
+    public void setVoteChanges(Map<UUID, Integer> data) {
+        this.voteChanges.clear();
+        this.voteChanges.putAll(data);
+    }
+
+    public Map<UUID, Integer> getVoteChanges() {
+        return Collections.unmodifiableMap(voteChanges);
     }
 
     public void setPlatform(UUID nominee, String platform) {
