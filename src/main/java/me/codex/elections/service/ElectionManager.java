@@ -3,9 +3,6 @@ package me.codex.elections.service;
 import me.codex.elections.ElectionsPlugin;
 import me.codex.elections.model.Election;
 import me.codex.elections.util.DurationUtil;
-import net.essentialsx.api.v2.events.AfkStatusChangeEvent;
-import net.essentialsx.api.v2.services.IEssentials;
-import net.essentialsx.api.v2.user.User;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.Bukkit;
@@ -14,6 +11,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Event;
 import org.bukkit.event.Listener;
 
 import java.time.Duration;
@@ -33,7 +31,7 @@ public class ElectionManager implements Listener {
     private int activityTaskId = -1;
     private final Map<UUID, Integer> activeSeconds = new HashMap<>();
     private final Set<UUID> afkPlayers = new HashSet<>();
-    private IEssentials essentials;
+    private boolean essentialsAfkHooked = false;
 
     public ElectionManager(ElectionsPlugin plugin, ScoreboardService scoreboardService) {
         this.plugin = plugin;
@@ -58,7 +56,7 @@ public class ElectionManager implements Listener {
 
     public void startActivityTracking() {
         stopActivityTracking();
-        this.essentials = Bukkit.getServicesManager().load(IEssentials.class);
+        this.essentialsAfkHooked = isEssentialsAfkAvailable();
         this.activityTaskId = plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, this::tickActivity, 20L, 20L);
     }
 
@@ -249,6 +247,23 @@ public class ElectionManager implements Listener {
                 continue;
             }
             activeSeconds.merge(player.getUniqueId(), 1, Integer::sum);
+        }
+    }
+
+    private boolean isAfk(Player player) {
+        return afkPlayers.contains(player.getUniqueId());
+    }
+
+    private boolean isEssentialsAfkAvailable() {
+        if (Bukkit.getPluginManager().getPlugin("Essentials") == null) {
+            return false;
+        }
+        try {
+            Class.forName("net.essentialsx.api.v2.events.AfkStatusChangeEvent");
+            return true;
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().warning("EssentialsX AFK API not found; falling back to counting all online time.");
+            return false;
         }
     }
 
@@ -704,33 +719,24 @@ public class ElectionManager implements Listener {
     }
 
     @EventHandler
-    public void onAfkChange(AfkStatusChangeEvent event) {
-        Player player = event.getAffected().getBase();
-        if (player == null) {
-            return;
-        }
-        if (event.getValue()) {
-            afkPlayers.add(player.getUniqueId());
-        } else {
-            afkPlayers.remove(player.getUniqueId());
-        }
-    }
-
-    private boolean isAfk(Player player) {
-        if (afkPlayers.contains(player.getUniqueId())) {
-            return true;
-        }
-        if (essentials != null) {
-            try {
-                User user = essentials.getUser(player.getUniqueId());
-                if (user != null && user.isAfk()) {
-                    afkPlayers.add(player.getUniqueId());
-                    return true;
-                }
-            } catch (Throwable ignored) {
+    public void onAfkChange(Event event) {
+        if (!essentialsAfkHooked) return;
+        if (!event.getClass().getName().equals("net.essentialsx.api.v2.events.AfkStatusChangeEvent")) return;
+        try {
+            java.lang.reflect.Method getValue = event.getClass().getMethod("getValue");
+            boolean afk = (boolean) getValue.invoke(event);
+            java.lang.reflect.Method getAffected = event.getClass().getMethod("getAffected");
+            Object user = getAffected.invoke(event);
+            if (user == null) return;
+            java.lang.reflect.Method getBase = user.getClass().getMethod("getBase");
+            Object base = getBase.invoke(user);
+            if (!(base instanceof Player player)) return;
+            if (afk) {
+                afkPlayers.add(player.getUniqueId());
+            } else {
+                afkPlayers.remove(player.getUniqueId());
             }
+        } catch (Exception ignored) {
         }
-        afkPlayers.remove(player.getUniqueId());
-        return false;
     }
 }
