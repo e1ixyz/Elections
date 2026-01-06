@@ -4,6 +4,8 @@ main: me.codex.elections.ElectionsPlugin
 api-version: '1.21'
 authors:
   - e1ixyz
+softdepend:
+  - Essentials
 commands:
   elections:
     description: Manage elections

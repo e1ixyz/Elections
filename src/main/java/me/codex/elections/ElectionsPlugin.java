@@ -22,6 +22,7 @@ public final class ElectionsPlugin extends JavaPlugin implements Listener {
         this.electionManager = new ElectionManager(this, scoreboardService);
 
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(electionManager, this);
 
         ElectionsCommand electionsCommand = new ElectionsCommand(electionManager, scoreboardService, this);
         getCommand("elections").setExecutor(electionsCommand);
@@ -33,6 +34,7 @@ public final class ElectionsPlugin extends JavaPlugin implements Listener {
 
         electionManager.loadState();
         electionManager.startTicking();
+        electionManager.startActivityTracking();
     }
 
     @Override
@@ -40,6 +42,7 @@ public final class ElectionsPlugin extends JavaPlugin implements Listener {
         if (electionManager != null) {
             electionManager.saveState();
             electionManager.stopTicking();
+            electionManager.stopActivityTracking();
         }
         if (scoreboardService != null) {
             scoreboardService.clearAll();

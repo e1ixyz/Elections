@@ -3,6 +3,9 @@ package me.codex.elections.service;
 import me.codex.elections.ElectionsPlugin;
 import me.codex.elections.model.Election;
 import me.codex.elections.util.DurationUtil;
+import net.essentialsx.api.v2.events.AfkStatusChangeEvent;
+import net.essentialsx.api.v2.services.IEssentials;
+import net.essentialsx.api.v2.user.User;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.Bukkit;
@@ -10,7 +13,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.Statistic;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,7 +22,7 @@ import java.util.*;
 import java.io.File;
 import java.io.IOException;
 
-public class ElectionManager {
+public class ElectionManager implements Listener {
 
     private final ElectionsPlugin plugin;
     private final ScoreboardService scoreboardService;
@@ -26,6 +30,10 @@ public class ElectionManager {
     private UUID lastWinnerId;
     private String lastRole;
     private int taskId = -1;
+    private int activityTaskId = -1;
+    private final Map<UUID, Integer> activeSeconds = new HashMap<>();
+    private final Set<UUID> afkPlayers = new HashSet<>();
+    private IEssentials essentials;
 
     public ElectionManager(ElectionsPlugin plugin, ScoreboardService scoreboardService) {
         this.plugin = plugin;
@@ -45,6 +53,19 @@ public class ElectionManager {
         if (taskId != -1) {
             plugin.getServer().getScheduler().cancelTask(taskId);
             taskId = -1;
+        }
+    }
+
+    public void startActivityTracking() {
+        stopActivityTracking();
+        this.essentials = Bukkit.getServicesManager().load(IEssentials.class);
+        this.activityTaskId = plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, this::tickActivity, 20L, 20L);
+    }
+
+    public void stopActivityTracking() {
+        if (activityTaskId != -1) {
+            plugin.getServer().getScheduler().cancelTask(activityTaskId);
+            activityTaskId = -1;
         }
     }
 
@@ -109,6 +130,13 @@ public class ElectionManager {
                 changes.put(UUID.fromString(voter), yaml.getInt("current.voteChanges." + voter, 0));
             }
             election.setVoteChanges(changes);
+        }
+
+        // active seconds
+        if (yaml.isConfigurationSection("activitySeconds")) {
+            for (String id : yaml.getConfigurationSection("activitySeconds").getKeys(false)) {
+                activeSeconds.put(UUID.fromString(id), yaml.getInt("activitySeconds." + id, 0));
+            }
         }
 
         // nominations map
@@ -180,6 +208,10 @@ public class ElectionManager {
             yaml.createSection("current.nominations", nominations);
         }
 
+        Map<String, Integer> activity = new HashMap<>();
+        activeSeconds.forEach((id, seconds) -> activity.put(id.toString(), seconds));
+        yaml.createSection("activitySeconds", activity);
+
         try {
             yaml.save(file);
         } catch (IOException ex) {
@@ -209,6 +241,15 @@ public class ElectionManager {
         }
 
         scoreboardService.updateAll(currentElection);
+    }
+
+    private void tickActivity() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (isAfk(player)) {
+                continue;
+            }
+            activeSeconds.merge(player.getUniqueId(), 1, Integer::sum);
+        }
     }
 
     public ActionResult createElection(String role, Duration duration) {
@@ -343,8 +384,8 @@ public class ElectionManager {
             return ActionResult.fail(color("&cVoting is closed. Results are being displayed."));
         }
         int requiredHours = plugin.getConfig().getInt("voting.required-playtime-hours", 12);
-        long ticksPlayed = voter.getStatistic(Statistic.PLAY_ONE_MINUTE);
-        long hoursPlayed = ticksPlayed / 72000;
+        long secondsPlayed = activeSeconds.getOrDefault(voter.getUniqueId(), 0);
+        long hoursPlayed = secondsPlayed / 3600;
         if (hoursPlayed < requiredHours) {
             return ActionResult.fail(msg("messages.vote-playtime")
                     .replace("%needed%", String.valueOf(requiredHours))
@@ -660,5 +701,36 @@ public class ElectionManager {
         public static ActionResult fail(String message) {
             return new ActionResult(false, message);
         }
+    }
+
+    @EventHandler
+    public void onAfkChange(AfkStatusChangeEvent event) {
+        Player player = event.getAffected().getBase();
+        if (player == null) {
+            return;
+        }
+        if (event.getValue()) {
+            afkPlayers.add(player.getUniqueId());
+        } else {
+            afkPlayers.remove(player.getUniqueId());
+        }
+    }
+
+    private boolean isAfk(Player player) {
+        if (afkPlayers.contains(player.getUniqueId())) {
+            return true;
+        }
+        if (essentials != null) {
+            try {
+                User user = essentials.getUser(player.getUniqueId());
+                if (user != null && user.isAfk()) {
+                    afkPlayers.add(player.getUniqueId());
+                    return true;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        afkPlayers.remove(player.getUniqueId());
+        return false;
     }
 }
