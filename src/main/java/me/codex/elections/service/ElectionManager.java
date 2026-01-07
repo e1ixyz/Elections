@@ -10,9 +10,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Event;
-import org.bukkit.event.Listener;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +17,7 @@ import java.util.*;
 import java.io.File;
 import java.io.IOException;
 
-public class ElectionManager implements Listener {
+public class ElectionManager {
 
     private final ElectionsPlugin plugin;
     private final ScoreboardService scoreboardService;
@@ -30,8 +27,8 @@ public class ElectionManager implements Listener {
     private int taskId = -1;
     private int activityTaskId = -1;
     private final Map<UUID, Integer> activeSeconds = new HashMap<>();
-    private final Set<UUID> afkPlayers = new HashSet<>();
     private boolean essentialsAfkHooked = false;
+    private Object essentialsPlugin;
 
     public ElectionManager(ElectionsPlugin plugin, ScoreboardService scoreboardService) {
         this.plugin = plugin;
@@ -56,7 +53,7 @@ public class ElectionManager implements Listener {
 
     public void startActivityTracking() {
         stopActivityTracking();
-        this.essentialsAfkHooked = isEssentialsAfkAvailable();
+        this.essentialsAfkHooked = hookEssentialsAfk();
         this.activityTaskId = plugin.getServer().getScheduler().scheduleSyncRepeatingTask(plugin, this::tickActivity, 20L, 20L);
     }
 
@@ -91,7 +88,6 @@ public class ElectionManager implements Listener {
         String typeStr = yaml.getString("current.type", Election.Type.REGULAR.name());
         String statusStr = yaml.getString("current.status", Election.Status.ACTIVE.name());
         long endsAt = yaml.getLong("current.endsAt", 0L);
-        long startedAt = yaml.getLong("current.startedAt", System.currentTimeMillis());
 
         Election.Type type = Election.Type.valueOf(typeStr);
         Election.Status status = Election.Status.valueOf(statusStr);
@@ -250,19 +246,20 @@ public class ElectionManager implements Listener {
         }
     }
 
-    private boolean isAfk(Player player) {
-        return afkPlayers.contains(player.getUniqueId());
-    }
-
-    private boolean isEssentialsAfkAvailable() {
-        if (Bukkit.getPluginManager().getPlugin("Essentials") == null) {
+    private boolean hookEssentialsAfk() {
+        org.bukkit.plugin.Plugin ess = Bukkit.getPluginManager().getPlugin("Essentials");
+        if (ess == null) {
             return false;
         }
         try {
-            Class.forName("net.essentialsx.api.v2.events.AfkStatusChangeEvent");
+            Class<?> essentialsClass = Class.forName("com.earth2me.essentials.Essentials");
+            if (!essentialsClass.isInstance(ess)) {
+                return false;
+            }
+            this.essentialsPlugin = ess;
             return true;
         } catch (ClassNotFoundException e) {
-            plugin.getLogger().warning("EssentialsX AFK API not found; falling back to counting all online time.");
+            plugin.getLogger().warning("EssentialsX API not found; AFK-aware playtime disabled.");
             return false;
         }
     }
@@ -718,25 +715,17 @@ public class ElectionManager implements Listener {
         }
     }
 
-    @EventHandler
-    public void onAfkChange(Event event) {
-        if (!essentialsAfkHooked) return;
-        if (!event.getClass().getName().equals("net.essentialsx.api.v2.events.AfkStatusChangeEvent")) return;
+    private boolean isAfk(Player player) {
+        if (!essentialsAfkHooked || essentialsPlugin == null) {
+            return false;
+        }
         try {
-            java.lang.reflect.Method getValue = event.getClass().getMethod("getValue");
-            boolean afk = (boolean) getValue.invoke(event);
-            java.lang.reflect.Method getAffected = event.getClass().getMethod("getAffected");
-            Object user = getAffected.invoke(event);
-            if (user == null) return;
-            java.lang.reflect.Method getBase = user.getClass().getMethod("getBase");
-            Object base = getBase.invoke(user);
-            if (!(base instanceof Player player)) return;
-            if (afk) {
-                afkPlayers.add(player.getUniqueId());
-            } else {
-                afkPlayers.remove(player.getUniqueId());
-            }
-        } catch (Exception ignored) {
+            Class<?> essentialsClass = essentialsPlugin.getClass();
+            Object user = essentialsClass.getMethod("getUser", UUID.class).invoke(essentialsPlugin, player.getUniqueId());
+            if (user == null) return false;
+            return (boolean) user.getClass().getMethod("isAfk").invoke(user);
+        } catch (Exception e) {
+            return false;
         }
     }
 }
